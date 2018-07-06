@@ -19,31 +19,44 @@ package org.apache.rocketmq.remoting.netty;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
-import java.nio.ByteBuffer;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
-    private static final Logger log = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
+import java.nio.ByteBuffer;
 
+/**
+ * Netty编码器
+ *
+ * @Author Administrator
+ * @Date 2018/6/29 0029 09 14
+ * @Description
+ */
+public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
+    
+    private static final Logger log = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
+    
     @Override
-    public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out)
-        throws Exception {
+    public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out) {
         try {
+            // 将的命令头编码，并写进ByteBuf
             ByteBuffer header = remotingCommand.encodeHeader();
             out.writeBytes(header);
+            // 如果命令主体部分不为空，则写入ByteBuf
             byte[] body = remotingCommand.getBody();
             if (body != null) {
                 out.writeBytes(body);
             }
         } catch (Exception e) {
+            // 出现异常，打印异常信息
             log.error("encode exception, " + RemotingHelper.parseChannelRemoteAddr(ctx.channel()), e);
+            // 如果命令不为空，打印命令信息
             if (remotingCommand != null) {
                 log.error(remotingCommand.toString());
             }
+            // 关闭连接通道
             RemotingUtil.closeChannel(ctx.channel());
         }
     }

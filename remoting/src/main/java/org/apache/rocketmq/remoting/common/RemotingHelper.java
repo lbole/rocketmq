@@ -30,17 +30,29 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+/**
+ * 远程相关工具
+ */
 public class RemotingHelper {
+    
+    // 日志命令
     public static final String ROCKETMQ_REMOTING = "RocketmqRemoting";
+    // 字符串编集
     public static final String DEFAULT_CHARSET = "UTF-8";
-
+    
     private static final Logger log = LoggerFactory.getLogger(ROCKETMQ_REMOTING);
-
+    
+    /**
+     * 获取异常信息并拼接成字符串
+     *
+     * @param e
+     * @return
+     */
     public static String exceptionSimpleDesc(final Throwable e) {
         StringBuffer sb = new StringBuffer();
         if (e != null) {
             sb.append(e.toString());
-
+            
             StackTraceElement[] stackTrace = e.getStackTrace();
             if (stackTrace != null && stackTrace.length > 0) {
                 StackTraceElement elment = stackTrace[0];
@@ -48,68 +60,83 @@ public class RemotingHelper {
                 sb.append(elment.toString());
             }
         }
-
+        
         return sb.toString();
     }
-
+    
+    /**
+     * 将IP和端口拼接承德字符串转换为网络地址
+     *
+     * @param addr
+     * @return
+     */
     public static SocketAddress string2SocketAddress(final String addr) {
         String[] s = addr.split(":");
         InetSocketAddress isa = new InetSocketAddress(s[0], Integer.parseInt(s[1]));
         return isa;
     }
-
-    public static RemotingCommand invokeSync(final String addr, final RemotingCommand request,
-        final long timeoutMillis) throws InterruptedException, RemotingConnectException,
-        RemotingSendRequestException, RemotingTimeoutException {
+    
+    /**
+     *
+     * @param addr
+     * @param request
+     * @param timeoutMillis
+     * @return
+     * @throws InterruptedException
+     * @throws RemotingConnectException
+     * @throws RemotingSendRequestException
+     * @throws RemotingTimeoutException
+     */
+    public static RemotingCommand invokeSync(final String addr, final RemotingCommand request, final long timeoutMillis) throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
         long beginTime = System.currentTimeMillis();
         SocketAddress socketAddress = RemotingUtil.string2SocketAddress(addr);
         SocketChannel socketChannel = RemotingUtil.connect(socketAddress);
         if (socketChannel != null) {
             boolean sendRequestOK = false;
-
+            
             try {
-
+                
                 socketChannel.configureBlocking(true);
-
+                
                 //bugfix  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4614802
                 socketChannel.socket().setSoTimeout((int) timeoutMillis);
-
+                
                 ByteBuffer byteBufferRequest = request.encode();
                 while (byteBufferRequest.hasRemaining()) {
                     int length = socketChannel.write(byteBufferRequest);
                     if (length > 0) {
                         if (byteBufferRequest.hasRemaining()) {
                             if ((System.currentTimeMillis() - beginTime) > timeoutMillis) {
-
+                                
                                 throw new RemotingSendRequestException(addr);
                             }
                         }
                     } else {
                         throw new RemotingSendRequestException(addr);
                     }
-
+                    
                     Thread.sleep(1);
                 }
-
+                
                 sendRequestOK = true;
-
+                
                 ByteBuffer byteBufferSize = ByteBuffer.allocate(4);
                 while (byteBufferSize.hasRemaining()) {
                     int length = socketChannel.read(byteBufferSize);
                     if (length > 0) {
                         if (byteBufferSize.hasRemaining()) {
                             if ((System.currentTimeMillis() - beginTime) > timeoutMillis) {
-
+                                
                                 throw new RemotingTimeoutException(addr, timeoutMillis);
                             }
                         }
                     } else {
                         throw new RemotingTimeoutException(addr, timeoutMillis);
                     }
-
+                    
                     Thread.sleep(1);
                 }
-
+                
                 int size = byteBufferSize.getInt(0);
                 ByteBuffer byteBufferBody = ByteBuffer.allocate(size);
                 while (byteBufferBody.hasRemaining()) {
@@ -117,22 +144,22 @@ public class RemotingHelper {
                     if (length > 0) {
                         if (byteBufferBody.hasRemaining()) {
                             if ((System.currentTimeMillis() - beginTime) > timeoutMillis) {
-
+                                
                                 throw new RemotingTimeoutException(addr, timeoutMillis);
                             }
                         }
                     } else {
                         throw new RemotingTimeoutException(addr, timeoutMillis);
                     }
-
+                    
                     Thread.sleep(1);
                 }
-
+                
                 byteBufferBody.flip();
                 return RemotingCommand.decode(byteBufferBody);
             } catch (IOException e) {
                 log.error("invokeSync failure", e);
-
+                
                 if (sendRequestOK) {
                     throw new RemotingTimeoutException(addr, timeoutMillis);
                 } else {
@@ -149,35 +176,35 @@ public class RemotingHelper {
             throw new RemotingConnectException(addr);
         }
     }
-
+    
     public static String parseChannelRemoteAddr(final Channel channel) {
         if (null == channel) {
             return "";
         }
         SocketAddress remote = channel.remoteAddress();
         final String addr = remote != null ? remote.toString() : "";
-
+        
         if (addr.length() > 0) {
             int index = addr.lastIndexOf("/");
             if (index >= 0) {
                 return addr.substring(index + 1);
             }
-
+            
             return addr;
         }
-
+        
         return "";
     }
-
+    
     public static String parseSocketAddressAddr(SocketAddress socketAddress) {
         if (socketAddress != null) {
             final String addr = socketAddress.toString();
-
+            
             if (addr.length() > 0) {
                 return addr.substring(1);
             }
         }
         return "";
     }
-
+    
 }

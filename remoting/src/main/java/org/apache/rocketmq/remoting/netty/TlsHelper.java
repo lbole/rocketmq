@@ -60,59 +60,77 @@ import static org.apache.rocketmq.remoting.netty.TlsSystemConfig.tlsServerTrustC
 import static org.apache.rocketmq.remoting.netty.TlsSystemConfig.tlsTestModeEnable;
 
 public class TlsHelper {
-
+    
     public interface DecryptionStrategy {
         /**
          * Decrypt the target encrpted private key file.
+         * 对目标加密的私钥文件进行解密。
          *
          * @param privateKeyEncryptPath A pathname string
-         * @param forClient tells whether it's a client-side key file
+         * @param forClient             tells whether it's a client-side key file
          * @return An input stream for a decrypted key file
          * @throws IOException if an I/O error has occurred
          */
         InputStream decryptPrivateKey(String privateKeyEncryptPath, boolean forClient) throws IOException;
     }
-
+    
     private static final Logger LOGGER = LoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
-
+    
     private static DecryptionStrategy decryptionStrategy = new DecryptionStrategy() {
         @Override
-        public InputStream decryptPrivateKey(final String privateKeyEncryptPath,
-            final boolean forClient) throws IOException {
+        public InputStream decryptPrivateKey(final String privateKeyEncryptPath, final boolean forClient) throws IOException {
             return new FileInputStream(privateKeyEncryptPath);
         }
     };
-
-
+    
+    /**
+     * 注册解密策略
+     *
+     * @param decryptionStrategy
+     */
     public static void registerDecryptionStrategy(final DecryptionStrategy decryptionStrategy) {
         TlsHelper.decryptionStrategy = decryptionStrategy;
     }
-
+    
+    /**
+     * 构建SSL上下文
+     *
+     * @param forClient
+     * @return
+     * @throws IOException
+     * @throws CertificateException
+     */
     public static SslContext buildSslContext(boolean forClient) throws IOException, CertificateException {
+        // 获取SSL配置文件
         File configFile = new File(TlsSystemConfig.tlsConfigFile);
+        // 从文件中提取TLS配置
         extractTlsConfigFromFile(configFile);
+        //记录最终TLS的使用配置
         logTheFinalUsedTlsConfig();
-
+        
+        // 获取SSL提供者
         SslProvider provider;
         if (OpenSsl.isAvailable()) {
+            // 使用OpenSSL生产者
             provider = SslProvider.OPENSSL;
             LOGGER.info("Using OpenSSL provider");
         } else {
+            // 使用JDK SSL生产者
             provider = SslProvider.JDK;
             LOGGER.info("Using JDK SSL provider");
         }
-
+        
         if (forClient) {
             if (tlsTestModeEnable) {
                 return SslContextBuilder
-                    .forClient()
-                    .sslProvider(SslProvider.JDK)
-                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
-                    .build();
+                        .forClient()
+                        .sslProvider(SslProvider.JDK)
+                        .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                        .build();
             } else {
                 SslContextBuilder sslContextBuilder = SslContextBuilder.forClient().sslProvider(SslProvider.JDK);
-
-
+                
+                
                 if (!tlsClientAuthServer) {
                     sslContextBuilder.trustManager(InsecureTrustManagerFactory.INSTANCE);
                 } else {
@@ -120,29 +138,29 @@ public class TlsHelper {
                         sslContextBuilder.trustManager(new File(tlsClientTrustCertPath));
                     }
                 }
-
+                
                 return sslContextBuilder.keyManager(
-                    !isNullOrEmpty(tlsClientCertPath) ? new FileInputStream(tlsClientCertPath) : null,
-                    !isNullOrEmpty(tlsClientKeyPath) ? decryptionStrategy.decryptPrivateKey(tlsClientKeyPath, true) : null,
-                    !isNullOrEmpty(tlsClientKeyPassword) ? tlsClientKeyPassword : null)
-                    .build();
+                        !isNullOrEmpty(tlsClientCertPath) ? new FileInputStream(tlsClientCertPath) : null,
+                        !isNullOrEmpty(tlsClientKeyPath) ? decryptionStrategy.decryptPrivateKey(tlsClientKeyPath, true) : null,
+                        !isNullOrEmpty(tlsClientKeyPassword) ? tlsClientKeyPassword : null)
+                        .build();
             }
         } else {
-
+            
             if (tlsTestModeEnable) {
                 SelfSignedCertificate selfSignedCertificate = new SelfSignedCertificate();
                 return SslContextBuilder
-                    .forServer(selfSignedCertificate.certificate(), selfSignedCertificate.privateKey())
-                    .sslProvider(SslProvider.JDK)
-                    .clientAuth(ClientAuth.OPTIONAL)
-                    .build();
+                        .forServer(selfSignedCertificate.certificate(), selfSignedCertificate.privateKey())
+                        .sslProvider(SslProvider.JDK)
+                        .clientAuth(ClientAuth.OPTIONAL)
+                        .build();
             } else {
                 SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
-                    !isNullOrEmpty(tlsServerCertPath) ? new FileInputStream(tlsServerCertPath) : null,
-                    !isNullOrEmpty(tlsServerKeyPath) ? decryptionStrategy.decryptPrivateKey(tlsServerKeyPath, false) : null,
-                    !isNullOrEmpty(tlsServerKeyPassword) ? tlsServerKeyPassword : null)
-                    .sslProvider(provider);
-
+                        !isNullOrEmpty(tlsServerCertPath) ? new FileInputStream(tlsServerCertPath) : null,
+                        !isNullOrEmpty(tlsServerKeyPath) ? decryptionStrategy.decryptPrivateKey(tlsServerKeyPath, false) : null,
+                        !isNullOrEmpty(tlsServerKeyPassword) ? tlsServerKeyPassword : null)
+                        .sslProvider(provider);
+                
                 if (!tlsServerAuthClient) {
                     sslContextBuilder.trustManager(InsecureTrustManagerFactory.INSTANCE);
                 } else {
@@ -150,19 +168,24 @@ public class TlsHelper {
                         sslContextBuilder.trustManager(new File(tlsServerTrustCertPath));
                     }
                 }
-
+                
                 sslContextBuilder.clientAuth(parseClientAuthMode(tlsServerNeedClientAuth));
                 return sslContextBuilder.build();
             }
         }
     }
-
+    
+    /**
+     * 从文件中提取TLS配置
+     *
+     * @param configFile
+     */
     private static void extractTlsConfigFromFile(final File configFile) {
         if (!(configFile.exists() && configFile.isFile() && configFile.canRead())) {
             LOGGER.info("Tls config file doesn't exist, skip it");
             return;
         }
-
+        
         Properties properties;
         properties = new Properties();
         InputStream inputStream = null;
@@ -178,7 +201,7 @@ public class TlsHelper {
                 }
             }
         }
-
+        
         tlsTestModeEnable = Boolean.parseBoolean(properties.getProperty(TLS_TEST_MODE_ENABLE, String.valueOf(tlsTestModeEnable)));
         tlsServerNeedClientAuth = properties.getProperty(TLS_SERVER_NEED_CLIENT_AUTH, tlsServerNeedClientAuth);
         tlsServerKeyPath = properties.getProperty(TLS_SERVER_KEYPATH, tlsServerKeyPath);
@@ -186,14 +209,17 @@ public class TlsHelper {
         tlsServerCertPath = properties.getProperty(TLS_SERVER_CERTPATH, tlsServerCertPath);
         tlsServerAuthClient = Boolean.parseBoolean(properties.getProperty(TLS_SERVER_AUTHCLIENT, String.valueOf(tlsServerAuthClient)));
         tlsServerTrustCertPath = properties.getProperty(TLS_SERVER_TRUSTCERTPATH, tlsServerTrustCertPath);
-
+        
         tlsClientKeyPath = properties.getProperty(TLS_CLIENT_KEYPATH, tlsClientKeyPath);
         tlsClientKeyPassword = properties.getProperty(TLS_CLIENT_KEYPASSWORD, tlsClientKeyPassword);
         tlsClientCertPath = properties.getProperty(TLS_CLIENT_CERTPATH, tlsClientCertPath);
         tlsClientAuthServer = Boolean.parseBoolean(properties.getProperty(TLS_CLIENT_AUTHSERVER, String.valueOf(tlsClientAuthServer)));
         tlsClientTrustCertPath = properties.getProperty(TLS_CLIENT_TRUSTCERTPATH, tlsClientTrustCertPath);
     }
-
+    
+    /**
+     * 记录最终TLS的使用配置
+     */
     private static void logTheFinalUsedTlsConfig() {
         LOGGER.info("Log the final used tls related configuration");
         LOGGER.info("{} = {}", TLS_TEST_MODE_ENABLE, tlsTestModeEnable);
@@ -203,28 +229,28 @@ public class TlsHelper {
         LOGGER.info("{} = {}", TLS_SERVER_CERTPATH, tlsServerCertPath);
         LOGGER.info("{} = {}", TLS_SERVER_AUTHCLIENT, tlsServerAuthClient);
         LOGGER.info("{} = {}", TLS_SERVER_TRUSTCERTPATH, tlsServerTrustCertPath);
-
+        
         LOGGER.info("{} = {}", TLS_CLIENT_KEYPATH, tlsClientKeyPath);
         LOGGER.info("{} = {}", TLS_CLIENT_KEYPASSWORD, tlsClientKeyPassword);
         LOGGER.info("{} = {}", TLS_CLIENT_CERTPATH, tlsClientCertPath);
         LOGGER.info("{} = {}", TLS_CLIENT_AUTHSERVER, tlsClientAuthServer);
         LOGGER.info("{} = {}", TLS_CLIENT_TRUSTCERTPATH, tlsClientTrustCertPath);
     }
-
+    
     private static ClientAuth parseClientAuthMode(String authMode) {
         if (null == authMode || authMode.trim().isEmpty()) {
             return ClientAuth.NONE;
         }
-
+        
         for (ClientAuth clientAuth : ClientAuth.values()) {
             if (clientAuth.name().equals(authMode.toUpperCase())) {
                 return clientAuth;
             }
         }
-
+        
         return ClientAuth.NONE;
     }
-
+    
     /**
      * Determine if a string is {@code null} or {@link String#isEmpty()} returns {@code true}.
      */

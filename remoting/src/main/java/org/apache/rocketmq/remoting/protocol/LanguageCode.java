@@ -17,6 +17,9 @@
 
 package org.apache.rocketmq.remoting.protocol;
 
+/**
+ * 客户端语言类型
+ */
 public enum LanguageCode {
     JAVA((byte) 0),
     CPP((byte) 1),
@@ -29,13 +32,13 @@ public enum LanguageCode {
     HTTP((byte) 8),
     GO((byte) 9),
     PHP((byte) 10);
-
+    
     private byte code;
-
+    
     LanguageCode(byte code) {
         this.code = code;
     }
-
+    
     public static LanguageCode valueOf(byte code) {
         for (LanguageCode languageCode : LanguageCode.values()) {
             if (languageCode.getCode() == code) {
@@ -44,7 +47,7 @@ public enum LanguageCode {
         }
         return null;
     }
-
+    
     public byte getCode() {
         return code;
     }

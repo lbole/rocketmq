@@ -16,9 +16,20 @@
  */
 package org.apache.rocketmq.remoting.netty;
 
+/**
+ * Netty时间类型
+ *
+ * @Author Administrator
+ * @Date 2018/6/29 0029 09 14
+ * @Description
+ */
 public enum NettyEventType {
+    // 连接成功事件
     CONNECT,
+    // 关闭成功状态
     CLOSE,
+    // 判定为空闲事件
     IDLE,
+    // 出现异常事件
     EXCEPTION
 }
